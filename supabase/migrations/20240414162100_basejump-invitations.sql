@@ -22,6 +22,8 @@ create table if not exists basejump.invitations
     invited_by_user_id uuid references auth.users                               not null,
     -- account name. filled in by a trigger
     account_name       text,
+    -- invited email
+    email              text,
     -- when the invitation was last updated
     updated_at         timestamp with time zone,
     -- when the invitation was created
@@ -227,22 +229,29 @@ grant execute on function public.lookup_invitation(text) to authenticated;
 /**
   Allows a user to create a new invitation if they are an owner of an account
  */
-create or replace function public.create_invitation(account_id uuid, account_role basejump.account_role,
-                                                    invitation_type basejump.invitation_type)
-    returns json
-    language plpgsql
+create or replace function public.create_invitation(
+    account_id uuid, 
+    account_role basejump.account_role, 
+    email text, 
+    invitation_type basejump.invitation_type
+)
+returns json
+language plpgsql
 as
 $$
 declare
     new_invitation basejump.invitations;
 begin
-    insert into basejump.invitations (account_id, account_role, invitation_type, invited_by_user_id)
-    values (account_id, account_role, invitation_type, auth.uid())
+    -- Insert the invitation into the basejump.invitations table with the email
+    insert into basejump.invitations (account_id, account_role, invitation_type, invited_by_user_id, email)
+    values (account_id, account_role, invitation_type, auth.uid(), email)
     returning * into new_invitation;
 
+    -- Return the token of the new invitation as a JSON object
     return json_build_object('token', new_invitation.token);
 end
 $$;
+
 
 grant execute on function public.create_invitation(uuid, basejump.account_role, basejump.invitation_type) to authenticated;
 
